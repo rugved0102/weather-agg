@@ -1,89 +1,145 @@
 # Weather Aggregation Service
 
-A Go-based microservice that aggregates weather information from multiple sources (currently using mock data).
+A simple weather service that combines temperature and humidity data from multiple sources to provide averaged weather information. Built with Go, it uses Redis for caching and Docker for easy deployment.
 
-## Quick Start
+## What Does It Do?
 
-### Prerequisites
-- Go 1.21 or higher
-- Docker (optional)
+1. Gets weather data from:
+   - Open-Meteo API (real weather data, no API key needed)
+   - Backup mock provider (for testing/fallback)
+2. Combines and averages the data
+3. Caches results in Redis for faster responses
+4. Provides simple REST API endpoints
 
-### Running Locally
+## Getting Started
 
+### What You Need
+- Docker and Docker Compose
+  - That's it! Docker handles everything else
+- (Optional) Go 1.21+ if you want to run without Docker
+
+### Quick Start (Using Docker)
 ```bash
-# Clone the repository
+# 1. Get the code
 git clone https://github.com/rugved0102/weather-agg.git
 cd weather-agg
 
-# Run the server
-go run cmd/server/main.go
-```
+# 2. Start everything
+docker compose up --build
 
-### Using Docker
-
-```bash
-# Build the Docker image
-docker build -t weather-api .
-
-# Run the container
-docker run -p 8080:8080 weather-api
-```
-
-## API Documentation
-
-### GET /weather
-
-Retrieves weather information for a specified city.
-
-**Parameters:**
-- `city` (query parameter, optional) - Name of the city to get weather for
-  - If not provided, defaults to "Unknown"
-
-**Response:**
-```json
-{
-    "city": "string",
-    "temp_c": number,
-    "humidity": number,
-    "retrieved_at": "string (ISO 8601)"
-}
-```
-
-**Example Request:**
-```bash
+# 3. Try it out
 curl "http://localhost:8080/weather?city=London"
 ```
 
-**Example Response:**
+### Developer Setup (Without Docker)
+```bash
+# 1. Get the code
+git clone https://github.com/rugved0102/weather-agg.git
+cd weather-agg
+
+# 2. Start Redis
+docker run -d --name redis -p 6379:6379 redis:alpine
+
+# 3. Run the service
+go run ./cmd/server
+```
+
+## API Guide
+
+### Getting Weather Data
+```http
+GET /weather?city=CityName
+```
+
+This gets weather data for any city. For example:
+```bash
+# Using curl
+curl "http://localhost:8080/weather?city=London"
+
+# Using PowerShell
+Invoke-WebRequest "http://localhost:8080/weather?city=London"
+```
+
+You'll get back something like this:
 ```json
 {
     "city": "London",
-    "temp_c": 27.3,
-    "humidity": 62,
-    "retrieved_at": "2025-11-02T12:34:56Z"
+    "avg_temp_c": 18.5,           # Temperature in Celsius
+    "avg_humidity": 65,           # Humidity percentage
+    "providers": [                # Where the data came from
+        "openmeteo",
+        "mock-A"
+    ],
+    "provider_count": 2,          # How many providers responded
+    "retrieved_at": "2025-11-02T12:34:56Z"  # When the data was fetched
 }
 ```
 
-## Project Structure
+### Checking If Service Is Working
+```http
+GET /healthz
+```
 
-```
-weather-agg/
-├── cmd/
-│   └── server/
-│       └── main.go    # Main application entry point
-├── Dockerfile         # Container configuration
-├── README.md         # Project documentation
-└── go.mod            # Go module definition
-```
+Returns "ok" if everything is working. Use this to monitor service health.
 
 ## Configuration
 
-The service runs with the following default configuration:
-- Port: 8080
-- Read Timeout: 5 seconds
-- Write Timeout: 10 seconds
-- Idle Timeout: 60 seconds
-- Request Timeout: 8 seconds
+You can customize the service using these settings (all are optional):
+
+```env
+# Where to find Redis
+REDIS_ADDR=redis:6379   # Format: hostname:port
+
+# Web server settings
+PORT=8080              # What port to run on
+CACHE_TTL=10m         # How long to cache results (e.g., 10m = 10 minutes)
+
+# Timeouts (using Go duration format: 5s = 5 seconds, 1m = 1 minute)
+SERVER_READ_TIMEOUT=5s    # How long to wait for client requests
+SERVER_WRITE_TIMEOUT=10s  # How long to wait when sending responses
+SERVER_IDLE_TIMEOUT=60s   # How long to keep connections alive
+PROVIDER_TIMEOUT=6s       # How long to wait for weather providers
+REQUEST_TIMEOUT=8s        # Total time limit for each request
+```
+
+To use these:
+1. Create a `.env` file with your settings, or
+2. Set them in your terminal before running the service
+
+## Project Layout
+
+Here's how the code is organized:
+
+```
+weather-agg/
+├── cmd/server/              # Main application
+│   └── main.go             # Entry point, sets everything up
+│
+├── internal/               # Core functionality
+│   ├── provider/          # Weather data providers
+│   │   ├── provider.go    # Interface for all providers
+│   │   ├── openmeteo.go   # Real weather data provider
+│   │   └── mockprovider.go# Test/backup provider
+│   │
+│   ├── agg/              # Data processing
+│   │   └── aggregator.go # Combines weather data
+│   │
+│   └── cache/            # Data storage
+│       ├── convert.go    # Data conversion helpers
+│       └── redis.go      # Redis storage implementation
+│
+├── pkg/                   # Shared utilities
+│   └── logger/           # Logging tools
+│
+└── docker-compose.yml    # Docker configuration
+```
+
+Each folder has a specific job:
+- `cmd/server`: The main program
+- `internal/provider`: Gets weather data
+- `internal/agg`: Processes the data
+- `internal/cache`: Stores the data
+- `pkg/logger`: Helps with logging
 
 ## Development
 
@@ -93,7 +149,7 @@ The service runs with the following default configuration:
 # Build the binary
 go build ./cmd/server
 
-# Run tests (when added)
+# Run tests
 go test ./...
 ```
 
@@ -103,23 +159,12 @@ go test ./...
 docker build -t weather-api .
 ```
 
-## Future Enhancements
-
-- [ ] Integration with real weather APIs
-- [ ] Caching layer for weather data
-- [ ] Rate limiting
-- [ ] Metrics and monitoring
-- [ ] Authentication
-- [ ] Environment-based configuration
-- [ ] Unit and integration tests
-
 ## Security
 
-The service includes several security measures:
 - Runs as non-root user in Docker
-- Includes proper timeout configurations
-- Uses multi-stage Docker builds
-- Includes SSL certificates for HTTPS support
+- Proper timeout configurations
+- Multi-stage Docker builds
+- Redis only accessible within Docker network
 
 ## License
 

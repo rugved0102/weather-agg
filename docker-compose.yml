@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   weather-api:
     build:
@@ -9,7 +7,18 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - REDIS_HOST=redis
+      # Redis Configuration
+      - REDIS_ADDR=redis:6379
+      # Server Configuration
+      - PORT=${PORT:-8080}
+      - SERVER_READ_TIMEOUT=${SERVER_READ_TIMEOUT:-5s}
+      - SERVER_WRITE_TIMEOUT=${SERVER_WRITE_TIMEOUT:-10s}
+      - SERVER_IDLE_TIMEOUT=${SERVER_IDLE_TIMEOUT:-60s}
+      # Cache Configuration
+      - CACHE_TTL=${CACHE_TTL:-10m}
+      # Provider Configuration
+      - PROVIDER_TIMEOUT=${PROVIDER_TIMEOUT:-6s}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-8s}
     depends_on:
       - redis
     restart: unless-stopped
