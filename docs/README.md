@@ -14,6 +14,12 @@ Welcome to the detailed documentation for the Weather Aggregation Service. This 
    - Component interactions
    - Data flow and processing
 
+3. [Docker Guide](./docker.md)
+   - Docker basics and concepts
+   - Common commands and workflows
+   - Troubleshooting tips
+   - Best practices
+
 3. [Technical Guides](#) (Coming soon)
    - API Reference
    - Configuration Guide
