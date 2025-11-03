@@ -44,6 +44,8 @@ services:
       POSTGRES_USER: weather
       POSTGRES_PASSWORD: weatherpass
       POSTGRES_DB: weatherdb
+      TZ: "Asia/Kolkata"
+      PGTZ: "Asia/Kolkata"
     ports:
       - "5432:5432"
     volumes:
