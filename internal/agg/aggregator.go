@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rugved0102/weather-agg/internal/metrics"
 	"github.com/rugved0102/weather-agg/internal/provider"
 )
 
@@ -70,6 +71,7 @@ func (a *Aggregator) Aggregate(ctx context.Context, city string) (AggregatedWeat
 	for rr := range ch {
 		if rr.err != nil {
 			errs = append(errs, rr.err)
+			metrics.ProviderErrorCounter.WithLabelValues(rr.r.Source).Inc()
 			continue
 		}
 		sumTemp += rr.r.TempC

@@ -31,7 +31,7 @@ func (s *Store) Init() error {
             city TEXT,
             temp_c REAL,
             humidity REAL,
-            retrieved_at TIMESTAMP
+            retrieved_at TIMESTAMPTZ
         )
     `)
 	return err

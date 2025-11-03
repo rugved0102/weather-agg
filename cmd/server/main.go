@@ -10,8 +10,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rugved0102/weather-agg/internal/agg"
 	"github.com/rugved0102/weather-agg/internal/cache"
+	"github.com/rugved0102/weather-agg/internal/metrics"
 	"github.com/rugved0102/weather-agg/internal/provider"
 	"github.com/rugved0102/weather-agg/internal/store"
 )
@@ -49,29 +51,43 @@ func main() {
 	aggregator := agg.NewAggregator(providers, 6*time.Second)
 
 	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
 	mux.HandleFunc("/weather", func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
 		city := r.URL.Query().Get("city")
 		if city == "" {
 			http.Error(w, "missing city", http.StatusBadRequest)
 			return
 		}
 
+		// Track request count
+		metrics.RequestCounter.WithLabelValues(city).Inc()
+
 		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 		defer cancel()
 
 		// check cache first
 		if aggCached, err := redisClient.GetAggregated(ctx, city); err == nil {
+			metrics.CacheHits.WithLabelValues("hit").Inc()
 			log.Printf("Cache hit for %s", city)
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(aggCached)
+			metrics.RequestDuration.WithLabelValues(city).Observe(time.Since(start).Seconds())
 			return
 		}
+		metrics.CacheHits.WithLabelValues("miss").Inc()
 
 		// not cached -> aggregate
 		aggRes, err := aggregator.Aggregate(ctx, city)
 		if err != nil {
 			http.Error(w, "aggregation error: "+err.Error(), http.StatusInternalServerError)
 			return
+		}
+
+		// Track successful provider responses
+		for _, prov := range aggRes.Providers {
+			metrics.ProviderSuccessCounter.WithLabelValues(prov).Inc()
 		}
 
 		// transform to cache shape used earlier
@@ -87,6 +103,7 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(aggRes)
+		metrics.RequestDuration.WithLabelValues(city).Observe(time.Since(start).Seconds())
 	})
 
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
