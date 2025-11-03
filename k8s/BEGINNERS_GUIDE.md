@@ -202,6 +202,41 @@ kubectl delete -f k8s/
    minikube dashboard
    ```
 
+## Monitoring Endpoints
+
+The application exposes two important endpoints for monitoring:
+
+### Health Check Endpoint
+
+```powershell
+# Check application health
+curl http://localhost:8080/healthz
+# or
+Invoke-WebRequest -Uri http://localhost:8080/healthz -UseBasicParsing
+
+# Expected response: "ok" if the application is healthy
+```
+
+### Metrics Endpoint
+
+```powershell
+# View Prometheus metrics
+curl http://localhost:8080/metrics
+# or
+Invoke-WebRequest -Uri http://localhost:8080/metrics -UseBasicParsing
+
+# This endpoint exposes various metrics including:
+# - Go runtime metrics (memory, goroutines, GC stats)
+# - Process metrics (CPU, memory, file descriptors)
+# - Application-specific metrics
+```
+
+The metrics endpoint provides valuable information for monitoring:
+- Memory usage and garbage collection statistics
+- Number of active goroutines
+- Process statistics (CPU, memory, file descriptors)
+- HTTP handler metrics
+
 ## Need Help?
 
 If you see errors:
@@ -209,3 +244,4 @@ If you see errors:
 2. Verify configurations
 3. Ensure prerequisites are met
 4. Ask for specific error messages
+5. Check health and metrics endpoints for application status
