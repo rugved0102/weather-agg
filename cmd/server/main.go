@@ -96,7 +96,7 @@ func main() {
 		_ = redisClient.StoreAggregated(ctx, cacheAgg)
 
 		// Save to PostgreSQL for analytics
-		if err := db.SaveWeather(city, aggRes.AvgTempC, float64(aggRes.AvgHumidity)); err != nil {
+		if err := db.SaveWeather(city, aggRes.AvgTempC, float64(aggRes.AvgHumidity), len(aggRes.Providers)); err != nil {
 			log.Printf("Failed to save weather data to database: %v", err)
 			// Don't fail the request if database save fails
 		}

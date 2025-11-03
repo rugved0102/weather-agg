@@ -26,22 +26,23 @@ func NewStore(connStr string) (*Store, error) {
 
 func (s *Store) Init() error {
 	_, err := s.DB.Exec(`
-        CREATE TABLE IF NOT EXISTS weather_logs (
+        CREATE TABLE IF NOT EXISTS weather_history (
             id SERIAL PRIMARY KEY,
-            city TEXT,
-            temp_c REAL,
-            humidity REAL,
-            retrieved_at TIMESTAMPTZ
+            city VARCHAR(100) NOT NULL,
+            temperature_c NUMERIC(5,2),
+            humidity INTEGER,
+            provider_count INTEGER,
+            retrieved_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )
     `)
 	return err
 }
 
-func (s *Store) SaveWeather(city string, temp, humidity float64) error {
+func (s *Store) SaveWeather(city string, temp, humidity float64, providerCount int) error {
 	_, err := s.DB.Exec(
-		`INSERT INTO weather_logs (city, temp_c, humidity, retrieved_at)
-         VALUES ($1, $2, $3, NOW())`,
-		city, temp, humidity,
+		`INSERT INTO weather_history (city, temperature_c, humidity, provider_count, retrieved_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+		city, temp, humidity, providerCount,
 	)
 	return err
 }

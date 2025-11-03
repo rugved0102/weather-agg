@@ -22,15 +22,44 @@ docker run -p 8080:8080 \
 
 ## Option 2: Running with Kubernetes (What we set up)
 
+### First Time Setup
 ```powershell
-# 1. Start minikube (your local kubernetes cluster)
+# 1. Start minikube (only needed once after computer restart)
 minikube start
 
-# 2. Deploy everything at once
+# 2. Deploy everything (only needed first time or after changes)
 kubectl apply -f k8s/
+```
+
+### Daily Usage
+```powershell
+# 1. Check if minikube is running
+minikube status
+
+# If not running, start it:
+minikube start
+
+# 2. Check if pods are running
+kubectl get pods -n weather-app
 
 # 3. Forward the port to access the application
+# (Keep this terminal open while using the application)
 kubectl port-forward svc/weather-api 8080:8080 -n weather-app
+```
+
+### Useful Commands
+```powershell
+# Check if everything is running properly
+kubectl get pods -n weather-app
+
+# View application logs
+kubectl logs -n weather-app -l app=weather-api
+
+# Stop everything when you're done
+minikube stop
+
+# Clean up everything (only if you want to start fresh)
+kubectl delete -f k8s/
 ```
 
 ## Main Differences

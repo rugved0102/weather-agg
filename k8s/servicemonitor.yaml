@@ -2,9 +2,13 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: weather-api
+  namespace: weather-app
   labels:
-    release: prometheus  # matches Prometheus Operator's label selector
+    release: monitoring  # matches our Prometheus installation name
 spec:
+  namespaceSelector:
+    matchNames:
+      - weather-app
   selector:
     matchLabels:
       app: weather-api

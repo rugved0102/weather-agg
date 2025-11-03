@@ -1,6 +1,60 @@
 # Weather Aggregation Service
 
-A simple weather service that combines temperature and humidity data from multiple sources to provide averaged weather information. Built with Go, it uses Redis for caching and Docker for easy deployment.
+A production-ready weather service that combines temperature and humidity data from multiple sources to provide averaged weather information. Built with Go, uses Redis for caching, PostgreSQL for data persistence, and runs on Kubernetes for scalability and reliability.
+
+## System Architecture
+
+```
+                                    ┌─────────────────┐
+                                    │                 │
+                          ┌────────►│  Open-Meteo API │
+                          │         │                 │
+                          │         └─────────────────┘
+                          │
+┌──────────────┐    ┌─────────────┐    ┌──────────────┐
+│              │    │             │    │              │
+│   Client    ─────►│ Weather API ├───►│  Mock API    │
+│              │    │             │    │              │
+└──────────────┘    └─────────────┘    └──────────────┘
+                          │
+                          │         ┌─────────────┐
+                          │         │             │
+                          ├────────►│    Redis    │
+                          │         │   (Cache)   │
+                          │         │             │
+                          │         └─────────────┘
+                          │
+                          │         ┌─────────────┐
+                          │         │             │
+                          └────────►│ PostgreSQL  │
+                                    │    (DB)     │
+                                    │             │
+                                    └─────────────┘
+```
+
+### Components:
+
+1. **Weather API (Core Service)**
+   - Written in Go 1.21
+   - Aggregates weather data from multiple providers
+   - Implements circuit breakers and timeouts
+   - Exposes REST API endpoints
+   - Prometheus metrics for monitoring
+
+2. **Redis Cache**
+   - Caches weather data
+   - Reduces load on external APIs
+   - Improves response times
+   - Configurable TTL
+
+3. **PostgreSQL Database**
+   - Stores historical weather data
+   - Maintains user preferences
+   - Enables data analysis
+
+4. **Weather Providers**
+   - Open-Meteo API (primary provider)
+   - Mock Provider (backup/testing)
 
 ## What Does It Do?
 
@@ -82,15 +136,63 @@ GET /healthz
 
 Returns "ok" if everything is working. Use this to monitor service health.
 
+## Deployment Options
+
+### 1. Local Development (Docker)
+```bash
+# Start everything with Docker Compose
+docker compose up --build
+
+# Access the API
+curl "http://localhost:8080/weather?city=London"
+```
+
+### 2. Production Deployment (Kubernetes)
+```bash
+# 1. Start Kubernetes cluster
+minikube start
+
+# 2. Deploy the application stack
+kubectl apply -f k8s/
+
+# 3. Forward the port
+kubectl port-forward svc/weather-api 8080:8080 -n weather-app
+```
+
+See [QUICKSTART.md](QUICKSTART.md) for detailed deployment instructions.
+
+## Monitoring & Observability
+
+### Health Check
+```bash
+# Check service health
+curl http://localhost:8080/healthz
+```
+
+### Metrics
+```bash
+# View Prometheus metrics
+curl http://localhost:8080/metrics
+```
+
+Available metrics include:
+- Go runtime metrics (memory, goroutines, GC stats)
+- Process metrics (CPU, memory, file descriptors)
+- HTTP handler metrics
+- Custom business metrics
+
 ## Configuration
 
-You can customize the service using these settings (all are optional):
+You can customize the service using these settings:
 
 ```env
-# Where to find Redis
-REDIS_ADDR=redis:6379   # Format: hostname:port
+# Redis Configuration
+REDIS_ADDR=redis-master:6379
 
-# Web server settings
+# Database Configuration
+DB_URL=postgres://postgres:password@postgres-postgresql:5432/weather
+
+# Web Server Settings
 PORT=8080              # What port to run on
 CACHE_TTL=10m         # How long to cache results (e.g., 10m = 10 minutes)
 
@@ -106,32 +208,24 @@ To use these:
 1. Create a `.env` file with your settings, or
 2. Set them in your terminal before running the service
 
-## Project Layout
-
-Here's how the code is organized:
+## Project Structure
 
 ```
 weather-agg/
-├── cmd/server/              # Main application
-│   └── main.go             # Entry point, sets everything up
-│
-├── internal/               # Core functionality
-│   ├── provider/          # Weather data providers
-│   │   ├── provider.go    # Interface for all providers
-│   │   ├── openmeteo.go   # Real weather data provider
-│   │   └── mockprovider.go# Test/backup provider
-│   │
-│   ├── agg/              # Data processing
-│   │   └── aggregator.go # Combines weather data
-│   │
-│   └── cache/            # Data storage
-│       ├── convert.go    # Data conversion helpers
-│       └── redis.go      # Redis storage implementation
-│
-├── pkg/                   # Shared utilities
-│   └── logger/           # Logging tools
-│
-└── docker-compose.yml    # Docker configuration
+├── cmd/server/           # Application entrypoint
+├── internal/            # Core business logic
+│   ├── provider/       # Weather data providers
+│   ├── agg/           # Data aggregation
+│   └── cache/         # Caching logic
+├── k8s/               # Kubernetes manifests
+│   ├── configmap.yaml    # Configuration
+│   ├── secrets.yaml      # Sensitive data
+│   ├── deployment.yaml   # Pod configuration
+│   ├── service.yaml      # Network routing
+│   ├── hpa.yaml          # Auto-scaling
+│   └── servicemonitor.yaml # Prometheus integration
+├── pkg/                # Shared utilities
+└── docker-compose.yml  # Local development
 ```
 
 Each folder has a specific job:
@@ -143,28 +237,43 @@ Each folder has a specific job:
 
 ## Development
 
-### Building
+### Prerequisites
+- Go 1.21+
+- Docker & Docker Compose
+- Kubernetes tools (for production deployment):
+  - minikube
+  - kubectl
+  - helm
 
+### Building
 ```bash
-# Build the binary
+# Build binary
 go build ./cmd/server
 
 # Run tests
 go test ./...
-```
 
-### Docker Build
-
-```bash
+# Build Docker image
 docker build -t weather-api .
 ```
 
-## Security
+### Kubernetes Deployment
+See [k8s/BEGINNERS_GUIDE.md](k8s/BEGINNERS_GUIDE.md) for detailed Kubernetes deployment instructions.
 
-- Runs as non-root user in Docker
+## Security Features
+
+- Non-root container execution
+- Kubernetes secrets for sensitive data
+- Resource limits and quotas
+- Network policies
 - Proper timeout configurations
 - Multi-stage Docker builds
-- Redis only accessible within Docker network
+- Regular security updates
+- Prometheus metrics for monitoring
+
+## Documentation
+- [QUICKSTART.md](QUICKSTART.md): Getting started guide
+- [k8s/BEGINNERS_GUIDE.md](k8s/BEGINNERS_GUIDE.md): Kubernetes deployment guide
 
 ## License
 
