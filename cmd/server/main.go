@@ -13,14 +13,32 @@ import (
 	"github.com/rugved0102/weather-agg/internal/agg"
 	"github.com/rugved0102/weather-agg/internal/cache"
 	"github.com/rugved0102/weather-agg/internal/provider"
+	"github.com/rugved0102/weather-agg/internal/store"
 )
 
 func main() {
+	// Initialize Redis
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
 		redisAddr = "localhost:6379"
 	}
 	redisClient := cache.NewRedis(redisAddr, "") // assumes NewRedis(addr, pwd)
+
+	// Initialize PostgreSQL
+	dbURL := os.Getenv("DB_URL")
+	if dbURL == "" {
+		dbURL = "postgres://weather:weatherpass@localhost:5432/weatherdb?sslmode=disable"
+	}
+
+	db, err := store.NewStore(dbURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.Init(); err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
 
 	// build providers
 	providers := []provider.Provider{
@@ -60,6 +78,12 @@ func main() {
 		cacheAgg := cache.ModelToAggregatedWeather(aggRes)
 		_ = redisClient.SetAggregated(ctx, cacheAgg, 10*time.Minute)
 		_ = redisClient.StoreAggregated(ctx, cacheAgg)
+
+		// Save to PostgreSQL for analytics
+		if err := db.SaveWeather(city, aggRes.AvgTempC, float64(aggRes.AvgHumidity)); err != nil {
+			log.Printf("Failed to save weather data to database: %v", err)
+			// Don't fail the request if database save fails
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(aggRes)

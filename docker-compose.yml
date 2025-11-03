@@ -9,6 +9,8 @@ services:
     environment:
       # Redis Configuration
       - REDIS_ADDR=redis:6379
+      # Database Configuration
+      - DB_URL=postgres://weather:weatherpass@postgres:5432/weatherdb?sslmode=disable
       # Server Configuration
       - PORT=${PORT:-8080}
       - SERVER_READ_TIMEOUT=${SERVER_READ_TIMEOUT:-5s}
@@ -21,6 +23,7 @@ services:
       - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-8s}
     depends_on:
       - redis
+      - postgres
     restart: unless-stopped
     networks:
       - app-network
@@ -34,6 +37,24 @@ services:
       - app-network
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_USER: weather
+      POSTGRES_PASSWORD: weatherpass
+      POSTGRES_DB: weatherdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+    restart: unless-stopped
+
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  pgdata:
