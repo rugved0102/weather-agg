@@ -26,8 +26,22 @@ A production-ready weather service that combines temperature and humidity data f
                           │
                           │         ┌─────────────┐
                           │         │             │
-                          └────────►│ PostgreSQL  │
-                                    │    (DB)     │
+                          ├────────►│ PostgreSQL  │
+                          │         │    (DB)     │
+                          │         │             │
+                          │         └─────────────┘
+                          │
+                          │         ┌─────────────┐
+                          │         │             │
+                          ├────────►│ Prometheus  │
+                          │         │ (Metrics)   │
+                          │         │             │
+                          │         └──────┬──────┘
+                          │                │
+                          │         ┌──────▼──────┐
+                          │         │             │
+                          └────────►│  Grafana    │
+                                    │(Monitoring) │
                                     │             │
                                     └─────────────┘
 ```
@@ -40,21 +54,38 @@ A production-ready weather service that combines temperature and humidity data f
    - Implements circuit breakers and timeouts
    - Exposes REST API endpoints
    - Prometheus metrics for monitoring
+   - Health check endpoints
+   - Kubernetes-ready with resource limits and probes
 
 2. **Redis Cache**
    - Caches weather data
    - Reduces load on external APIs
    - Improves response times
    - Configurable TTL
+   - Cache hit/miss monitoring
 
 3. **PostgreSQL Database**
    - Stores historical weather data
    - Maintains user preferences
    - Enables data analysis
+   - Persistent storage in Kubernetes
 
 4. **Weather Providers**
    - Open-Meteo API (primary provider)
    - Mock Provider (backup/testing)
+   - Provider success rate monitoring
+   - Automatic failover between providers
+
+5. **Monitoring Stack**
+   - Prometheus for metrics collection
+   - Grafana for visualization
+   - Custom dashboards for:
+     - Request rates and latencies
+     - Cache performance
+     - Provider availability
+     - System resources
+   - ServiceMonitor for automatic discovery
+   - Health and readiness monitoring
 
 ## What Does It Do?
 
@@ -169,17 +200,48 @@ See [QUICKSTART.md](QUICKSTART.md) for detailed deployment instructions.
 curl http://localhost:8080/healthz
 ```
 
-### Metrics
+### Metrics and Monitoring Stack
+
+The service includes a comprehensive monitoring solution using Prometheus and Grafana:
+
+1. **Metrics Endpoint**
 ```bash
-# View Prometheus metrics
+# View raw Prometheus metrics
 curl http://localhost:8080/metrics
 ```
 
-Available metrics include:
-- Go runtime metrics (memory, goroutines, GC stats)
-- Process metrics (CPU, memory, file descriptors)
-- HTTP handler metrics
-- Custom business metrics
+2. **Available Metrics**
+- Custom Business Metrics:
+  - `weather_requests_total{city}` - Request count by city
+  - `weather_cache_hits_total{type}` - Cache hit/miss tracking
+  - `weather_request_duration_seconds{city}` - Request latency histograms
+  - `weather_provider_success_total{provider}` - Provider success rates
+- Standard Metrics:
+  - Go runtime metrics (memory, goroutines, GC stats)
+  - Process metrics (CPU, memory, file descriptors)
+  - HTTP handler metrics
+
+3. **Prometheus & Grafana Setup**
+```bash
+# Install monitoring stack
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install monitoring prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
+
+# Apply ServiceMonitor
+kubectl apply -f k8s/servicemonitor.yaml
+```
+
+4. **Accessing Dashboards**
+```bash
+# Access Prometheus
+kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 9090:9090
+
+# Access Grafana
+kubectl port-forward svc/monitoring-grafana -n monitoring 3001:80
+```
+
+For detailed monitoring setup and configuration, see [docs/monitoring/setup.md](docs/monitoring/setup.md).
 
 ## Configuration
 
